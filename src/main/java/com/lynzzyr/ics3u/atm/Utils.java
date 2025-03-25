@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Optional;
+import java.util.ArrayList;
 import java.util.Scanner;
 
 import org.json.simple.JSONObject;
@@ -30,7 +30,7 @@ public class Utils {
      * 
      * @param encrypt Default true. If decryption is desired set to false.
      */
-    public static String vigenere(String text, String key, Optional<Boolean> encrypt) {
+    public static String vigenere(String text, String key, boolean doEncrypt) {
         String out = "";
 
         // Loop for every character in input text
@@ -39,8 +39,8 @@ public class Utils {
             char k = Character.toLowerCase(key.charAt(i % key.length()));
 
             // Main turnary, may pass foreign chars
-            out = (Constants.vigSet.contains(Character.getNumericValue(c))) ? out + Character.toString(Constants.vigSet.get(
-                (Constants.vigSet.indexOf(Character.getNumericValue(c)) + (((encrypt.orElse(false)) ? 1 : -1) * Constants.vigSet.indexOf(Character.getNumericValue(k)))) % Constants.vigSet.size()
+            out = (Globals.VIG_SET.contains(Character.getNumericValue(c))) ? out + Character.toString(Globals.VIG_SET.get(
+                (Globals.VIG_SET.indexOf(Character.getNumericValue(c)) + ((doEncrypt ? 1 : -1) * Globals.VIG_SET.indexOf(Character.getNumericValue(k)))) % Globals.VIG_SET.size()
             )) : out + c;
         }
         return out;
@@ -74,13 +74,13 @@ public class Utils {
         // Database handling
         try {
             JSONObject db = (JSONObject) new JSONParser().parse(new FileReader("database.json"));
-            for (Object user : db.keySet()) { // Each key is a String
+            for (String user : (ArrayList<String>) new ArrayList<>(db.keySet())) {
                 // If current savings account is current key
-                if (session != null && session.getClass().toString().equals("com.lynzzyr.ics3u.atm.accounts.SavingsAccount") && session.getUsername().equals(user.toString())) {
+                if (session != null && session.getTypeNum() == 2 && session.getUsername().equals(user)) {
                     session.setValue(roundMoney(session.getValue() * (1 + session.getInterest().get() / 100 * months)));
                     saveSession(session);
                 } else {
-                    JSONObject dbUser = (JSONObject) db.get(user.toString());
+                    JSONObject dbUser = (JSONObject) db.get(user);
                     if (dbUser.get("type").toString().equals("SAVINGS")) {
                         dbUser.put("months", dbUser.containsKey("months") ? Integer.parseInt(dbUser.get("months").toString()) + months : months);
                         db.put(user, dbUser.toJSONString());

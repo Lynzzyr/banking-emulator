@@ -5,17 +5,27 @@ import java.util.Optional;
 
 import org.json.simple.JSONObject;
 
+import com.lynzzyr.ics3u.atm.Globals;
 import com.lynzzyr.ics3u.atm.Utils;
-import com.lynzzyr.ics3u.atm.exceptions.AccountChangeException;
 import com.lynzzyr.ics3u.atm.exceptions.AccountNotFoundException;
+import com.lynzzyr.ics3u.atm.exceptions.InvalidCredentialsException;
 
-/** A chequing account. */
+/** A chequing account. The history and amount may be presupplied for convenience. */
 public class ChequingAccount implements AccountBase {
     private String username;            // Username
     private String passcode;            // Passcode
     private ArrayList<String> history;  // Transaction history
     private double value;               // Amount
 
+    // New history
+    private ChequingAccount(String username, String passcode, double value) {
+        this.username = username;
+        this.passcode = passcode;
+        history = new ArrayList<>();
+        this.value = value;
+    }
+
+    // Provides history
     private ChequingAccount(String username, String passcode, ArrayList<String> history, double value) {
         this.username = username;
         this.passcode = passcode;
@@ -48,10 +58,10 @@ public class ChequingAccount implements AccountBase {
     }
 
     @Override
-    public Optional<Double> getInterest() {return null;}
+    public Optional<Double> getInterest() {return Optional.empty();}
 
     @Override
-    public Optional<Integer> getFreeWithdraws() {return null;}
+    public Optional<Integer> getFreeWithdraws() {return Optional.empty();}
 
     /** Sets the account amount. */
     @Override
@@ -80,15 +90,18 @@ public class ChequingAccount implements AccountBase {
         // TODO do this
     }
 
-    /**
-     * Creates and returns new instance of ChequingAccount with specified details.
-     * 
-     * The history and amount are normally randomly generated, however they may be specified beforehand for convenience, such as for account conversion.
-     */
-    public static ChequingAccount createNew(String username, String passcode, Optional<ArrayList<String>> history, Optional<Double> value) {
+    /** Creates and returns new instance of ChequingAccount with specified credentials. Will assign a random amount. */
+    public static ChequingAccount createNew(String username, String passcode) {
         return new ChequingAccount(
-            username, passcode, history.orElse(new ArrayList<>()),
-            value.orElse(Utils.roundMoney(500.0 + (2000.0 * Math.random()))) // Random value if not specified
+            username, passcode,
+            Utils.roundMoney(500.0 + (2000.0 * Math.random())) // Random value between 500 and 2500
+        );
+    }
+
+    /** Creates and returns new instance of ChequingAccount with specified credentials plus details for convenience. */
+    public static ChequingAccount createNew(String username, String passcode, ArrayList<String> history, double value) {
+        return new ChequingAccount(
+            username, passcode, new ArrayList<>(), value
         );
     }
 
@@ -105,6 +118,23 @@ public class ChequingAccount implements AccountBase {
 
         // Fetch user data
         JSONObject entry = (JSONObject) database.get(username);
-        // TODO finish this
+
+        // Passcode check, return instance
+        if (
+            Utils.vigenere(entry.get("test_string_a").toString(), passcode, false).equals(username + Globals.TEST_A) &&
+            Utils.vigenere(entry.get("test_string_b").toString(), passcode, false).equals(Globals.TEST_B)
+        ) {
+            // Decrypt history
+            ArrayList<String> history = new ArrayList<>();
+            for (String log : (ArrayList<String>) entry.get("history")) {
+                history.add(log);
+            }
+            return new ChequingAccount(
+                username, passcode, history,
+                Double.parseDouble(Utils.vigenere(entry.get("value").toString(), passcode, false)) // Amount
+            );
+        } else {
+            throw new InvalidCredentialsException("Incorrect passcode!");
+        }
     }
 }
